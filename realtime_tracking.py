@@ -28,7 +28,7 @@ except ImportError as e:
 
 # Load the YOLO model
 try:
-    model = YOLO('yolov5s.pt')  # or YOLO('yolov8n.pt')
+    model = YOLO('yolov5su.pt')  # or YOLO('yolov8n.pt')
     print("Successfully loaded YOLO model.")
 except Exception as e:
     print(f"Error loading YOLO model: {e}")
