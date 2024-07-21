@@ -35,13 +35,21 @@ except Exception as e:
     sys.exit()
 
 # Initialize SORT tracker
-tracker = Sort()
+try:
+    tracker = Sort()
+    print("Successfully initialized SORT tracker.")
+except Exception as e:
+    print(f"Error initializing SORT tracker: {e}")
+    sys.exit()
 
 # Open video capture (0 for webcam)
-cap = cv2.VideoCapture(0)
-
-if not cap.isOpened():
-    print("Error: Unable to access webcam.")
+try:
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        raise ValueError("Unable to access webcam.")
+    print("Webcam opened successfully.")
+except Exception as e:
+    print(f"Error opening video capture: {e}")
     sys.exit()
 
 # Setup Tkinter window
@@ -53,51 +61,77 @@ label = tk.Label(root)
 label.pack()
 
 def update_frame():
-    ret, frame = cap.read()
-    if not ret:
-        print("Error: Unable to read frame from webcam.")
+    try:
+        ret, frame = cap.read()
+        if not ret:
+            raise ValueError("Unable to read frame from webcam.")
+        
+        # Convert frame to RGB
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # Perform object detection
+        results = model(rgb_frame)
+
+        # Extract bounding boxes and confidences
+        detections = []
+        if hasattr(results, 'boxes'):
+            boxes = results.boxes
+            if boxes is not None:
+                for box in boxes:
+                    # The format of box: [x1, y1, x2, y2, conf, cls]
+                    try:
+                        x1, y1, x2, y2, conf, cls = box.tolist()
+                        detections.append([x1, y1, x2, y2, conf])
+                    except ValueError as e:
+                        print(f"Error unpacking detection result: {e}")
+                        continue
+        else:
+            print("No boxes found in the detection results.")
+
+        # Update tracker with detections
+        tracked_objects = tracker.update(np.array(detections))
+
+        # Draw bounding boxes and object IDs
+        for obj in tracked_objects:
+            x1, y1, x2, y2, obj_id, conf = obj
+            cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 2)
+            cv2.putText(frame, f'ID: {int(obj_id)}', (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
+        # Convert OpenCV frame to ImageTk format
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img = Image.fromarray(frame)
+        imgtk = ImageTk.PhotoImage(image=img)
+
+        # Update label with new image
+        label.imgtk = imgtk
+        label.configure(image=imgtk)
+
+    except Exception as e:
+        print(f"Error processing frame: {e}")
         root.quit()
         return
 
-    # Convert frame to RGB
-    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-    # Perform object detection
-    results = model(rgb_frame)
-
-    # Extract bounding boxes and confidences
-    detections = []
-    for result in results[0]:
-        for *box, conf, cls in result:
-            x1, y1, x2, y2 = box
-            detections.append([x1.item(), y1.item(), x2.item(), y2.item(), conf.item()])
-
-    # Update tracker with detections
-    tracked_objects = tracker.update(np.array(detections))
-
-    # Draw bounding boxes and object IDs
-    for obj in tracked_objects:
-        x1, y1, x2, y2, obj_id, conf = obj
-        cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 2)
-        cv2.putText(frame, f'ID: {int(obj_id)}', (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-
-    # Convert OpenCV frame to ImageTk format
-    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    img = Image.fromarray(frame)
-    imgtk = ImageTk.PhotoImage(image=img)
-
-    # Update label with new image
-    label.imgtk = imgtk
-    label.configure(image=imgtk)
-
     # Call this function again after 10 ms
     label.after(10, update_frame)
+
+def on_closing():
+    print("Closing application...")
+    cap.release()  # Release the webcam
+    print("Webcam released.")
+    root.destroy()  # Close the Tkinter window
+
+# Set the function to be called when the Tkinter window is closed
+root.protocol("WM_DELETE_WINDOW", on_closing)
 
 # Start the update loop
 update_frame()
 
 # Run the Tkinter event loop
-root.mainloop()
-
-# Release webcam when done
-cap.release()
+try:
+    root.mainloop()
+except Exception as e:
+    print(f"Error running Tkinter event loop: {e}")
+finally:
+    # Ensure the webcam is released
+    cap.release()
+    print("Webcam released.")
