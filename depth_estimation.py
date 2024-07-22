@@ -9,7 +9,7 @@ from sort import Sort
 from scipy.spatial.distance import euclidean
 
 # Define the correct path to the 'sort' directory
-sort_path = os.path.join('C:\\Users\\vidus\\OneDrive\\Documents\\GitHub\\TinyDrone-CV\\sort')
+sort_path = os.path.join('os.path.expanduser('~'), 'Downloads', 'realtime-tracking', 'Downloads', 'build', 'sort'')
 sys.path.append(sort_path)
 
 print(f"Adding {sort_path} to sys.path")
